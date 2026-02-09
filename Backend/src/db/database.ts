@@ -75,6 +75,14 @@ export async function initialize() {
       monitorValue VARCHAR(100)
     )
   `);
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS device_owners (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT,
+      device_id INT,
+      UNIQUE KEY unique_device_owner (user_id, device_id)
+    )
+  `);
   await connection.end();
 
   return drizzle(pool);

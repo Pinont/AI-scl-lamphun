@@ -1,4 +1,8 @@
 import { Elysia, t } from 'elysia'
+import { jwt } from '@elysiajs/jwt'
+import { and, eq } from 'drizzle-orm/sql/expressions/conditions'
+import { db } from '../..'
+import { deviceOwners, devies } from '../../db/schema'
 
 const deviceDataItem = t.Object({
   monitorItem: t.String(),
@@ -25,6 +29,24 @@ const deviceResponseSchema = t.Object({
   status: t.String()
 })
 
+const deviceLatestResponseSchema = t.Object({
+  code: t.Number(),
+  monitorValue: t.String(),
+  monitorTime: t.String()
+})
+
+const deviceRegisterResponseSchema = t.Object({
+  code: t.Number(),
+  message: t.String()
+})
+
+const getBearerToken = (authHeader?: string) => {
+  if (!authHeader) return null
+  const [scheme, token] = authHeader.split(' ')
+  if (scheme !== 'Bearer' || !token) return null
+  return token
+}
+
 const buildEmptyResponse = (deviceId: string) => ({
   code: 0,
   data: [
@@ -43,9 +65,134 @@ const buildEmptyResponse = (deviceId: string) => ({
   status: 'ok'
 })
 
-export const deviceV2Routes = new Elysia({
+export const deviceRoutes = new Elysia({
   prefix: '/api/v2/device'
 })
+  .use(
+    jwt({
+      name: 'jwt',
+      secret: process.env.JWT_SECRET ?? 'change-me'
+    })
+  )
+  .post(
+    '/register',
+    async ({ body, headers, jwt }) => {
+      const token = getBearerToken(headers.authorization)
+
+      if (!token) {
+        return {
+          code: 401,
+          message: 'Missing Authorization header'
+        }
+      }
+
+      const payload = await jwt.verify(token).catch(() => null)
+
+      if (!payload || typeof payload.id !== 'number') {
+        return {
+          code: 401,
+          message: 'Invalid or expired token'
+        }
+      }
+
+      const database = await db
+      const {
+        deviceId,
+        deviceSecretKey,
+        monitorItem,
+        customName,
+        deviceLocation
+      } = body
+
+      const existing = await database
+        .select()
+        .from(devies)
+        .where(eq(devies.secretId, deviceId))
+        .limit(1)
+
+      let deviceRecord = existing[0]
+
+      if (deviceRecord) {
+        const storedKey = deviceRecord.deviceKey ?? ''
+        const validKey = await Bun.password.verify(deviceSecretKey, storedKey)
+
+        if (!validKey) {
+          return {
+            code: 401,
+            message: 'Invalid device secret'
+          }
+        }
+      } else {
+        const hashedSecretKey = await Bun.password.hash(deviceSecretKey)
+
+        await database.insert(devies).values({
+          secretId: deviceId,
+          deviceKey: hashedSecretKey,
+          monitorItem,
+          customName: customName ?? null,
+          deviceName: null,
+          latitude: deviceLocation?.latitude ?? null,
+          longitude: deviceLocation?.longtitude ?? null
+        })
+
+        const created = await database
+          .select()
+          .from(devies)
+          .where(eq(devies.secretId, deviceId))
+          .limit(1)
+
+        deviceRecord = created[0]
+
+        if (!deviceRecord) {
+          return {
+            code: 500,
+            message: 'Failed to register device'
+          }
+        }
+      }
+
+      const ownership = await database
+        .select()
+        .from(deviceOwners)
+        .where(
+          and(
+            eq(deviceOwners.userId, payload.id),
+            eq(deviceOwners.deviceId, deviceRecord.id)
+          )
+        )
+        .limit(1)
+
+      if (ownership.length === 0) {
+        await database.insert(deviceOwners).values({
+          userId: payload.id,
+          deviceId: deviceRecord.id
+        })
+      }
+
+      return {
+        code: 200,
+        message: 'ok'
+      }
+    },
+    {
+      headers: t.Object({
+        authorization: t.String()
+      }),
+      body: t.Object({
+        deviceId: t.String(),
+        deviceSecretKey: t.String(),
+        monitorItem: t.String(),
+        customName: t.Optional(t.String()),
+        deviceLocation: t.Optional(
+          t.Object({
+            latitude: t.String(),
+            longtitude: t.String()
+          })
+        )
+      }),
+      response: deviceRegisterResponseSchema
+    }
+  )
   .post(
     '/',
     ({ body }) => {
@@ -93,7 +240,11 @@ export const deviceV2Routes = new Elysia({
       const baseUrl = process.env.MAIN_STREAM_URL
 
       if (!baseUrl) {
-        return new Response('MAIN_STREAM_URL is not set', { status: 500 })
+        return {
+          code: 500,
+          monitorValue: '',
+          monitorTime: ''
+        }
       }
 
       const response = await fetch(`${baseUrl}/latest`, {
@@ -105,11 +256,24 @@ export const deviceV2Routes = new Elysia({
       })
 
       if (!response.ok) {
-        const text = await response.text()
-        return new Response(text, { status: response.status })
+        return {
+          code: response.status,
+          monitorValue: '',
+          monitorTime: ''
+        }
       }
 
-      return await response.json()
+      const payload = await response.json()
+      const dataItem = payload?.data?.find(
+        (item: { data?: Array<{ monitorValue?: string; monitorTime?: string }> }) =>
+          Array.isArray(item.data) && item.data.length > 0
+      )?.data?.[0]
+
+      return {
+        code: typeof payload?.code === 'number' ? payload.code : response.status,
+        monitorValue: dataItem?.monitorValue ?? '',
+        monitorTime: dataItem?.monitorTime ?? ''
+      }
     },
     {
       body: t.Object({
@@ -117,6 +281,6 @@ export const deviceV2Routes = new Elysia({
         deviceSecretKey: t.String(),
         monitorItem: t.String()
       }),
-      response: deviceResponseSchema
+      response: deviceLatestResponseSchema
     }
   )

@@ -1,4 +1,4 @@
-import { mysqlTable, serial, varchar } from "drizzle-orm/mysql-core";
+import { int, mysqlTable, serial, varchar } from "drizzle-orm/mysql-core";
 
 export const devies = mysqlTable("devices", {
     id: serial("id").primaryKey(),
@@ -34,4 +34,10 @@ export const deviceData = mysqlTable("device_data", {
     monitorItem: varchar("monitorItem", { length: 255 }),
     monitorTime: varchar("monitorTime", { length: 100 }),
     monitorValue: varchar("monitorValue", { length: 100 })
+})
+
+export const deviceOwners = mysqlTable("device_owners", {
+    id: serial("id").primaryKey(),
+    userId: int("user_id").references(() => users.id),
+    deviceId: int("device_id").references(() => devies.id)
 })
