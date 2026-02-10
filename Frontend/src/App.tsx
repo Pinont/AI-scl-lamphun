@@ -1,6 +1,11 @@
-import { useState } from 'react';
-import DashboardPage from './pages/DashboradPage';
-import LoginPage from './pages/LoginPage';
+import { useState } from 'react'
+import StationManagement from './components/Station.tsx'
+import {BrowserRouter, Routes, Route, Link} from "react-router-dom"
+import { Home } from 'lucide-react';
+import Homepage from './components/Home.tsx';
+import DashboardPage from './pages/DashboradPage.tsx';
+import LoginPage from './pages/LoginPage.tsx';
+
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -13,15 +18,12 @@ function App() {
 
   return (
     <>
-      {/* 
-      {!isLoggedIn ? (
-        <LoginPage onLoginSuccess={handleLoginSuccess} />
-      ) : (
-        <DashboardPage />
-      )}
-      */}
-      <DashboardPage/>
-    </>
+        {!isLoggedIn ? (
+          <LoginPage onLoginSuccess={handleLoginSuccess} />
+        ) : (
+          <DashboardPage />
+        )}
+      </>
   );
 }
 
