@@ -1,13 +1,11 @@
 import WaterLevelChart from '../components/WaterLevelChart';
 import DataCard from '../components/DataCard';
-import Header from '../components/Header';
 import styles from '../styles/DashboradPage.module.css';
 import MapView  from '../components/MapView';
 
 function DashboardPage(){
     return(
         <>
-      <Header />
       <div className={styles.cardGrid}>
         
                 <DataCard 
