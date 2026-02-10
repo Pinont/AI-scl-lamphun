@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'; // 1. ต้อง import useState และ useEffect มาด้วย
 import { Search, MoreHorizontal } from 'lucide-react';
 // ตรวจสอบชื่อไฟล์ให้ดีว่าไฟล์ Station.ts หรือ Station.tsx อยู่โฟลเดอร์เดียวกันหรือไม่
-import { transformData, StationDaata, mockDatabaseData } from './Station'; 
+import { transformData, StationData, mockDatabaseData } from './Station.ts'; 
 
 const StationManagement: React.FC = () => {
   // -------------------------------------------------------
@@ -10,7 +10,7 @@ const StationManagement: React.FC = () => {
   
   // 2. ประกาศ State เพื่อเก็บข้อมูล stations
   // เริ่มต้นให้เป็น array ว่าง []
-  const [stations, setStations] = useState<StationDaata[]>([]);
+  const [stations, setStations] = useState<StationData[]>([]);
 
   // 3. ใช้ useEffect เพื่อดึงข้อมูลตอนโหลดหน้าเว็บครั้งแรก
   useEffect(() => {
@@ -86,7 +86,7 @@ const StationManagement: React.FC = () => {
                </div>
             </div>
           </td>
-          
+
 
           {/* 4. Date */}
           <td className="py-4 px-6 text-center font-bold text-gray-700 w-1/6">
