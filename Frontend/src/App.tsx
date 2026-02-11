@@ -64,11 +64,15 @@ function App() {
 
   return (
     <>
+    {/*
       {!isLoggedIn ? (
         <LoginPage onLoginSuccess={handleLoginSuccess} />
       ) : (
         <DashboardPage />
       )}
+        */}
+
+        <DashboardPage/>
     </>
   );
 }
