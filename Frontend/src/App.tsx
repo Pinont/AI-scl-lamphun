@@ -1,9 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import StationManagement from './components/Station.tsx'
-import {BrowserRouter, Routes, Route, Link} from "react-router-dom"
-import { Home } from 'lucide-react';
-import Homepage from './components/Home.tsx';
-import DashboardPage from './pages/DashboradPage.tsx';
+import DashboardPage from './pages/DashboardPage.tsx'
 import LoginPage from './pages/LoginPage.tsx';
 
 function App() {
@@ -68,15 +65,12 @@ function App() {
 
   return (
     <>
-    {/*
       {!isLoggedIn ? (
         <LoginPage onLoginSuccess={handleLoginSuccess} />
       ) : (
         <DashboardPage />
       )}
-        */}
 
-        <DashboardPage/>
     </>
   );
 }

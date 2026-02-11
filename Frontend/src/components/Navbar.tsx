@@ -1,5 +1,5 @@
 import { Routes, Route, Link, useLocation } from "react-router-dom";
-import DashboardPage from '../pages/DashboradPage'; // เช็คชื่อไฟล์ดีๆ นะครับ (Dashboard)
+import DashboardPage from '../pages/DashboardPage'; // เช็คชื่อไฟล์ดีๆ นะครับ (Dashboard)
 import Station from '../pages/Station';
 
 // 1. สร้างส่วน "หน้าตาปุ่มเมนู" ไว้เป็นตัวแปรข้างบน (เพื่อให้โค้ดอ่านง่าย)

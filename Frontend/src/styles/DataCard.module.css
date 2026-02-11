@@ -1,3 +1,5 @@
+
+
 /* Container หลักของ Card */
 .cardContainer {
   /* --- Layout (อิงตาม Figma) --- */
@@ -10,13 +12,12 @@
   padding: 38px 27px; /* Padding ตามรูป Figma */
   margin: 18px;
   
-  /* --- Style (อิงตาม Global Design System) --- */
-  background: var(--color-surface);
+  background: var(--color-bg-surface);
   border-radius: 40px;
   box-shadow: var(--shadow-md);
   
   /* เส้นสีด้านบน (Default) */
-  border-top: 10px solid var(--status-warning);
+  border-top: 10px solid var(--color-brand-accent);
   
   box-sizing: border-box;
 }
@@ -65,16 +66,16 @@
 
 /* Theme: สีส้ม (เตือนภัย/Warning) */
 .themeOrange {
-  border-color: var(--status-warning);
+  border-color: var(--color-brand-accent);
 }
 .textOrange {
-  color: var(--status-warning);
+  color: var(--color-brand-accent);
 }
 
 /* Theme: สีฟ้า (ปกติ/Brand) */
 .themeBlue {
-  border-color: var(--color-brand);
+  border-color: var(--color-brand-secondary);
 }
 .textBlue {
-  color: var(--color-brand);
+   color: var( --color-brand-secondary);
 }
