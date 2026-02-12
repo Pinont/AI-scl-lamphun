@@ -1,5 +1,4 @@
-import styles from '../styles/WaterLevelChart.module.css';
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   AreaChart,
   Area,
@@ -11,32 +10,32 @@ import {
   ReferenceLine
 } from 'recharts';
 
-export interface ChartData  {
+// --- CONFIG ---
+// ตั้งค่าความสูงของกราฟตรงนี้ (ตัดปัญหา CSS ไม่โหลด)
+const CHART_HEIGHT = 300; 
+
+// จำนวนจุดข้อมูลสูงสุดที่จะแสดงบนกราฟ (ถ้าเกินจะตัดตัวเก่าออก)
+const MAX_DATA_POINTS = 20;
+
+export interface ChartData {
   time: string;
   value: number;
-};
+}
 
-// หลีกเลี่ยงการ import TooltipProps จาก recharts เพื่อกันเวอร์ชัน mismatch
-type CustomTooltipProps = {
-  active?: boolean;
-  label?: string;
-  payload?: Array<{ value?: number }>;
-};
-
-const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label }) => {
+const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
-    const v = payload[0]?.value;
     return (
-      <div className={styles.customTooltip}>
-        {/* ผสม Global Class (text-caption) กับ Module Class */}
-        <p className={`text-caption ${styles.tooltipTime}`}>เวลา: {label} น.</p>
-
-        <div className={styles.tooltipValueRow}>
-          <div className={styles.tooltipDot} />
-          <span className={`text-data-md ${styles.tooltipValue}`}>
-            {typeof v === 'number' ? v.toFixed(2) : '-'} ม.
-          </span>
-        </div>
+      <div style={{
+        backgroundColor: '#fff',
+        padding: '10px',
+        border: '1px solid #ccc',
+        borderRadius: '8px',
+        fontSize: '14px'
+      }}>
+        <p style={{ margin: 0, color: '#666' }}>{label}</p>
+        <p style={{ margin: '5px 0 0', fontWeight: 'bold', color: '#0099FF' }}>
+          {Number(payload[0].value).toFixed(2)} ม.
+        </p>
       </div>
     );
   }
@@ -44,153 +43,150 @@ const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label })
 };
 
 export const WaterLevelChart: React.FC = () => {
+  // state สำหรับเก็บข้อมูลสะสม (History)
   const [data, setData] = useState<ChartData[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [currentValue, setCurrentValue] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
+  // ใช้ Ref เพื่อเก็บข้อมูลล่าสุดไว้ใช้ใน interval (แก้ปัญหา closure)
+  const dataRef = useRef<ChartData[]>([]);
 
-        const publicKey = import.meta.env.VITE_TIDB_PUBLIC_KEY as string | undefined;
-        const privateKey = import.meta.env.VITE_TIDB_PRIVATE_KEY as string | undefined;
-        const baseUrl = import.meta.env.VITE_API_ENDPOINT as string | undefined;
+  const fetchLatestData = async () => {
+    try {
+      // เรียก API ไปที่ /latest ตามข้อมูลที่คุณได้รับ
+      const response = await fetch(`/api/v2/device/latest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId: import.meta.env.VITE_API_DEVICE_ID,
+          deviceSecretKey: import.meta.env.VITE_API_deviceSecretKey,
+          monitorItem: import.meta.env.VITE_API_monitorItem,
+        })
+      });
 
-        if (!publicKey || !privateKey || !baseUrl) {
-          console.error('Missing .env', { hasPublic: !!publicKey, hasPrivate: !!privateKey, baseUrl });
-          setError('ยังไม่ได้ตั้งค่า .env (VITE_API_URL, VITE_TIDB_PUBLIC_KEY, VITE_TIDB_PRIVATE_KEY)');
-          return;
+      if (!response.ok) throw new Error('API Error');
+
+      const result = await response.json();
+      console.log("📦 New Data Packet:", result);
+
+      // ตรวจสอบว่ามีข้อมูล monitorValue หรือไม่
+      if (result.monitorValue) {
+        const val = parseFloat(result.monitorValue);
+        const timeStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        setCurrentValue(val);
+
+        const newItem = {
+          time: timeStr,
+          value: isNaN(val) ? 0 : val
+        };
+
+        // --- หัวใจสำคัญ: เอาข้อมูลใหม่ ต่อท้ายข้อมูลเก่า ---
+        const currentData = dataRef.current;
+        const newData = [...currentData, newItem];
+
+        // ถ้าข้อมูลเยอะเกินกำหนด ให้ตัดตัวแรกออก (เพื่อให้กราฟวิ่ง)
+        if (newData.length > MAX_DATA_POINTS) {
+          newData.shift();
         }
 
-        const authString = btoa(`${publicKey}:${privateKey}`);
+        // อัปเดต State และ Ref
+        dataRef.current = newData;
+        setData(newData);
+        setError(null);
+      } 
+    } catch (err) {
+      console.error("Fetch error:", err);
+      // ไม่ต้อง setError รุนแรง เพื่อให้กราฟยังค้างค่าเดิมไว้ได้
+    }
+  };
 
-        console.log('🔑 Auth String:', authString);
-        console.log('🔗 Fetching URL:', '/api-tidb?type=water_monitor');
+  useEffect(() => {
+    // ดึงข้อมูลครั้งแรกทันที
+    fetchLatestData();
 
-        // ยิงเข้า localhost ที่ path /api-tidb เดี๋ยว Vite จะส่งต่อให้เอง
-        const response = await fetch(`/api-tidb?type=water_monitor`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Basic ${authString}`,
-            // 'endpoint-type': 'draft', // ลองปิดบรรทัดนี้ดูก่อน
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
-        });
+    // ดึงข้อมูลใหม่ทุกๆ 5 วินาที (ปรับความเร็วตรงนี้ได้)
+    const interval = setInterval(fetchLatestData, 5000); 
 
-        if (!response.ok) throw new Error(`Error: ${response.status}`);
-
-        const result = await response.json();
-
-        // ทำให้แน่ใจว่าเป็นอาร์เรย์ก่อน .map
-        let apiData: any[] = [];
-        if (Array.isArray(result?.data?.rows)) apiData = result.data.rows;
-        else if (Array.isArray(result?.rows)) apiData = result.rows;
-        else if (Array.isArray(result)) apiData = result;
-
-        const formattedData: ChartData[] = apiData
-          .map((item: any) => {
-            const tStr = item.timestamp ?? item.created_at ?? item.time;
-            const t = tStr ? new Date(tStr) : null;
-            const raw = item.value ?? item.level ?? item.monitor_value ?? item.y;
-            const num = typeof raw === 'string' ? parseFloat(raw) : Number(raw);
-
-            return {
-              time: t && !isNaN(t.getTime())
-                ? t.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
-                : '-',
-              value: num
-            } as ChartData;
-          })
-          .filter(d => Number.isFinite(d.value));
-
-        setData(formattedData);
-      } catch (err) {
-        console.error('Fetch Error:', err);
-        setError('ไม่สามารถเชื่อมต่อข้อมูลได้');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
+    return () => clearInterval(interval);
   }, []);
 
-  if (isLoading) {
-    return (
-      <div className={`card ${styles.stateContainer}`}>
-        <span className="text-default">กำลังโหลดข้อมูลจาก TiDB...</span>
-      </div>
-    );
-  }
+  // --- Render ---
 
-  if (error) {
-    return (
-      <div className={`card ${styles.stateContainer}`}>
-        <span className={`text-default ${styles.errorText}`}>{error}</span>
-      </div>
-    );
-  }
-
-  if (!data.length) {
-    return (
-      <div className={`card ${styles.stateContainer}`}>
-        <span className="text-default">ไม่มีข้อมูลที่แสดง</span>
-      </div>
-    );
-  }
-
+  // Layout แบบ Inline Style 100% เพื่อแก้ปัญหา width(-1)
   return (
-    <div className={`card ${styles.chartCard}`}>
-      <div className={styles.header}>
+    <div style={{
+      backgroundColor: '#fff',
+      borderRadius: '12px',
+      padding: '20px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+      fontFamily: 'sans-serif',
+      display: 'flex',
+      flexDirection: 'column',
+      height: '450px' // กำหนดความสูงรวมของการ์ด
+    }}>
+      
+      {/* Header */}
+      <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h3 className="text-h3" style={{ margin: 0 }}>ระดับน้ำ (Real-time)</h3>
-          <p className="text-caption" style={{ margin: '4px 0 0 0' }}>ข้อมูลจาก TiDB Cloud</p>
+          <h3 style={{ margin: 0, fontSize: '18px' }}>ระดับน้ำ (Real-time)</h3>
+          <p style={{ margin: '5px 0 0', color: '#888', fontSize: '12px' }}>
+             อัปเดตล่าสุด: {currentValue !== null ? `${currentValue.toFixed(2)} ม.` : 'รอข้อมูล...'}
+          </p>
         </div>
-        <div className={styles.legend}>
-           <div className={styles.legendItem}>
-              <div className={`${styles.legendLine} ${styles.warning}`}></div>
-              <span className="text-caption">เฝ้าระวัง</span>
-           </div>
-           <div className={styles.legendItem}>
-              <div className={`${styles.legendLine} ${styles.critical}`}></div>
-              <span className="text-caption">วิกฤต</span>
-           </div>
+        
+        {/* Legend */}
+        <div style={{ display: 'flex', gap: '10px', fontSize: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <div style={{ width: '10px', height: '10px', backgroundColor: '#F59E0B' }}></div> เฝ้าระวัง
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <div style={{ width: '10px', height: '10px', backgroundColor: '#EF4444' }}></div> วิกฤต
+          </div>
         </div>
       </div>
 
-      {/* ใช้ความสูงคงที่เลี่ยงปัญหา container ไม่มีความสูง */}
-      <ResponsiveContainer width="100%" height={280}>
-        <AreaChart data={data} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-          <defs>
-            <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#0099FF" stopOpacity={0.2}/>
-              <stop offset="95%" stopColor="#0099FF" stopOpacity={0}/>
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-          <XAxis 
-            dataKey="time" axisLine={false} tickLine={false} 
-            tick={{ fontFamily: 'IBM Plex Mono', fontSize: 12, fill: '#6B7280' }} dy={10}
-          />
-          <YAxis 
-            axisLine={false} tickLine={false} 
-            tick={{ fontFamily: 'IBM Plex Mono', fontSize: 12, fill: '#6B7280' }} domain={['auto', 'auto']} 
-          />
-          <Tooltip content={<CustomTooltip />} />
-          <ReferenceLine y={3.5} stroke="#F59E0B" strokeDasharray="5 5" />
-          <ReferenceLine y={4.5} stroke="#EF4444" strokeDasharray="5 5" />
-          <Area 
-            type="monotone" 
-            dataKey="value" 
-            stroke="#0099FF" 
-            strokeWidth={3} 
-            fillOpacity={1} 
-            fill="url(#colorValue)" 
-          />
-        </AreaChart>
-      </ResponsiveContainer>
+      {/* Chart Container - บังคับความสูงตรงนี้เพื่อแก้ Error */}
+      <div style={{ width: '100%', height: CHART_HEIGHT, position: 'relative' }}>
+        
+        {data.length === 0 ? (
+          // Loading State
+          <div style={{ 
+            height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa' 
+          }}>
+            {error ? <span style={{color: 'red'}}>{error}</span> : "กำลังรอข้อมูลชุดแรก..."}
+          </div>
+        ) : (
+          // Graph
+          <ResponsiveContainer width="100%" height="100%" debounce={50}>
+            <AreaChart data={data}>
+              <defs>
+                <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#0099FF" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#0099FF" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
+              <XAxis dataKey="time" tick={{fontSize: 12}} stroke="#999" />
+              <YAxis domain={['auto', 'auto']} tick={{fontSize: 12}} stroke="#999" />
+              <Tooltip content={<CustomTooltip />} />
+              
+              <ReferenceLine y={3.5} stroke="#F59E0B" strokeDasharray="3 3" label={{ position: 'right', value: 'เฝ้าระวัง', fontSize: 10, fill: '#F59E0B' }} />
+              <ReferenceLine y={4.5} stroke="#EF4444" strokeDasharray="3 3" label={{ position: 'right', value: 'วิกฤต', fontSize: 10, fill: '#EF4444' }} />
+
+              <Area 
+                type="monotone" 
+                dataKey="value" 
+                stroke="#0099FF" 
+                strokeWidth={3} 
+                fillOpacity={1} 
+                fill="url(#colorValue)" 
+                isAnimationActive={false} // ปิด animation เพื่อความลื่นไหลเวลาข้อมูลขยับ
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
+      </div>
     </div>
   );
 };

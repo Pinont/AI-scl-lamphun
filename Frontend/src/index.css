@@ -3,19 +3,30 @@
 
 :root {
   /* --- Brand Colors  --- */
-  --color-brand: #0099FF;      /* ฟ้าลำพูน (Primary) */
-  --color-bg: #F3F4F6;         /* เทาอ่อน (Background) */
-  --color-surface: #FFFFFF;    /* ขาว (Card Background) */
+  --color-brand-primary: #1E40AF;      
+  --color-brand-secondary: #0099FF;
+  --color-brand-accent :#F59E0B;
+
+  --color-bg-page: #F3F4F6;         
+  --color-bg-surface: #FFFFFF;
+  --color-border-line: #FEFEFF;   
 
   /* --- Text Colors --- */
-  --text-primary: #111827;     /* ดำเข้ม (หัวข้อ) */
-  --text-secondary: #6B7280;   /* เทากลาง (คำอธิบาย) */
-  --text-inverse: #FFFFFF;     /* ขาว (บนปุ่ม) */
+  --color-text-primary: #111827;     
+  --color-text-secondary: #6B7280;
+  --color-text-tertiary:#9CA3AF;
+  --color-text-disabled:#D1D5DB;
+  --color-text-onBrand:#FFFFFF;  
 
-  /* --- Status Colors (สำหรับแจ้งเตือน) --- */
-  --status-normal: #10B981;    /* เขียว */
-  --status-warning: #F59E0B;   /* ส้ม */
-  --status-critical: #EF4444;  /* แดง */
+  /* --- Status Colors  --- */
+  --color-status-normal: #10B981;    
+  --color-status-warning: #FFAE00;  
+  --color-status-critical: #EF4444;
+  --color-status-device-offline: #6B7280;
+  
+  --color-graf-rain:rgba(68, 181, 194, 0.62);
+  --color-graf-waterLevel:#155DFC;
+
 
   /* --- Typography (Fonts) --- */
   --font-ui: 'Inter', system-ui, sans-serif;
@@ -25,6 +36,10 @@
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+
+  /*---Gradient Color*/
+  --brand-secondary-blen : linear-gradient(90deg, #1E40AF 0%, #000 100%);
 }
 
 /* 3. Global Reset */
@@ -32,7 +47,7 @@ body {
   margin: 0;
   background-color: var(--color-bg);
   color: var(--text-primary);
-  font-family: var(--font-ui); /* เริ่มต้นด้วยฟอนต์ Inter ทั้งเว็บ */
+  font-family: var(--font-ui); 
   -webkit-font-smoothing: antialiased;
 }
 
